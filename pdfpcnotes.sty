@@ -19,6 +19,8 @@
 \ProcessKeyvalOptions*
 
 \def\pdfpc@PANDOC{pandoc -f latex -t markdown }
+\gdef\beamer@atbeginpnote{}%
+\gdef\beamer@atendpnote{}%
 
 % Small macro to make inserting options easier.
 \newcommand\PDFPC@option[2]{
@@ -58,17 +60,19 @@
 <presentation>
 
 \newcommand<>{\beamer@inframepnote}[2][]{%
+    % according to beamer manual
+    % #1~number of arguments are normal arguments
+    % #number of arguments +1 is layout
+    \note#3[#1]{#2}% forward parameters 
     \ifbeamer@inlecture%
 	\only#3{%
 	    \def\beamer@temp{#1}%
 	    \ifx\beamer@temp\beamer@itemtext%
-		\expandafter\gdef\expandafter\beamer@noteitems%
-		\expandafter{\beamer@noteitems\item#2}%
 		\expandafter\gdef\expandafter\beamer@pnoteitems%
-		\expandafter{\beamer@pnoteitems ^^J - #2}%
+		\expandafter{\beamer@pnoteitems\item#2}%
 	    \else%
-		\expandafter\gdef\expandafter\beamer@notes%
-		\expandafter{\beamer@notes#2}%
+		\expandafter\gdef\expandafter\beamer@pnotes%
+		\expandafter{\beamer@pnotes#2}%
 	    \fi%
 	}%
 	\fi%
@@ -77,7 +81,8 @@
 
 
     \pretocmd\beamer@framenotesbegin{%
-	\gdef\beamer@pnoteitems{}
+	\gdef\beamer@pnoteitems{}%
+	\gdef\beamer@pnotes{}%
     }{}{}
     \pretocmd\beamer@framenotesend{%
 	\begingroup
@@ -88,15 +93,15 @@
 
 	\immediate\openout\pdfpcnotestmp\jobname.pdfpc.tmp\relax
 	\immediate\write\pdfpcnotestmp{%
-	    \unexpanded\expandafter{\beamer@atbeginnote}%
-	    \unexpanded\expandafter{\beamer@notes}%
+	    \unexpanded\expandafter{\beamer@atbeginpnote}%
+	    \unexpanded\expandafter{\beamer@pnotes}%
 	    %\beamer@notes%
-	    \ifx\beamer@noteitems\@empty\else%
+	    \ifx\beamer@pnoteitems\@empty\else%
 		\string\begin{enumerate}\string\itemsep=0pt\string\parskip=0pt%
-		    \unexpanded\expandafter{\beamer@noteitems}%
+		    \unexpanded\expandafter{\beamer@pnoteitems}%
 	    \string\end{enumerate}%
 	\fi%
-	\unexpanded\expandafter{\beamer@atendnote}%
+	\unexpanded\expandafter{\beamer@atendpnote}%
     }%
     \endgroup%
     \immediate\closeout\pdfpcnotestmp
@@ -118,76 +123,47 @@
     \fi%
 \next}
 
+\define@key{beamerpnotes}{enumerate}[true]{%
+  \def\beamer@pnoteenvstart{\begin{enumerate}\itemsep=0pt\parskip=0pt}%
+  \def\beamer@pnoteenvend{\end{enumerate}}}
+\define@key{beamerpnotes}{itemize}[true]{%
+  \def\beamer@pnoteenvstart{\begin{itemize}\itemsep=0pt\parskip=0pt}%
+  \def\beamer@pnoteenvend{\end{itemize}}}
+
+
 
 \newcommand\beamer@outsideframepnote[2][]{%
-    \beamer@savemode%
-    \ifbeamer@inlecture%
-	\def\beamer@noteenvstart{}%
-	\def\beamer@noteenvend{}%
-	\setkeys{beamernotes}{#1}%
-	\ifbeamer@notes
-	    \begingroup
-	    \setbeamertemplate{itemize item}{\textbullet}
-	    \setbeamertemplate{itemize subitem}{--}
-	    \setbeamertemplate{enumerate item}{\insertenumlabel.}
-	    \setbeamertemplate{enumerate subitem}{\insertenumlabel.\insertsubenumlabel}
-	    \def\@oddhead{}
-	    \def\@oddfoot{}
-	    \let\@evenhead\@oddhead
-	    \let\@evenfoot\@oddfoot
-	    \def\beamer@backgroundtemplate{}%
-	    \setbeamercolor{item}{fg=black,bg=white}
-	    \color{black}%
-	    \nointerlineskip
-	    \hbox{\hskip-\Gm@lmargin\hskip1cm\vbox to\textheight{%
-		    %pretend to have ``standard'' margins
-		    \edef\beamer@origlmargin{\Gm@lmargin}%
-		    \edef\beamer@origrmargin{\Gm@rmargin}%
-		    \def\Gm@lmargin{1cm}%
-		    \def\Gm@rmargin{1cm}%
-		    \textwidth=\dimexpr\paperwidth-\Gm@lmargin-\Gm@rmargin\relax%
-		    \hsize=\textwidth%
-		    \@arrayparboxrestore%
-		    \vskip-\headheight%
-		    \def\insertnote{\vbox{}%
-			\beamer@noteenvstart#2 \beamer@noteenvend%
-		    }%
-		    \begingroup
-		    \let\#\hashchar
-		    \immediate\write\pdfpcnotesfile{\#\#\# \theframenumber}%
-		    \endgroup%
-		    %\begingroup
-		    %\let\item=-
-		    %\message{def def #2}
-		    %\endgroup
-		    \begingroup
+    \note[#1]{#2}%
+  \beamer@savemode%
+  \ifbeamer@inlecture%
+    \def\beamer@pnoteenvstart{}%
+    \def\beamer@pnoteenvend{}%
+    \setkeys{beamerpnotes}{#1}%
+    %\ifbeamer@notes %always record notes
+	  %%%%%%%%%%%%%%%%%
+	    \begingroup%
+	    \let\#\hashchar%
+	    \immediate\write\pdfpcnotesfile{\#\#\# \theframenumber}%
+	    \endgroup%
+	    \begingroup%
+	    \immediate\openout\pdfpcnotestmp\jobname.pdfpc.tmp\relax%
+	    \immediate\write\pdfpcnotestmp{\unexpanded\expandafter{\beamer@pnoteenvstart}\unexpanded{#2}\unexpanded\expandafter{\beamer@pnoteenvend}}%
+	    \immediate\closeout\pdfpcnotestmp%
+	    \getabspath{\jobname.pdfpc.tmp}%
+	    \immediate\write18{\pdfpc@PANDOC \theabspath > \theabspath.markdown}%
+	    \begingroup\obeylines%
+	    \CatchFileDef{\tmpvar}{\theabspath.markdown}{}%
+	    \newlinechar`\^^M%
+	    \immediate\write\pdfpcnotesfile{\unexpanded\expandafter{\tmpvar}}%
+	    \newlinechar`\^^J%
+	    \endgroup%
+	    \endgroup%
+	    %%%%%%%%%%%%%%%
+    %\fi%
+  \fi%
+  \beamer@resumemode}
 
-		    \immediate\openout\pdfpcnotestmp\jobname.pdfpc.tmp\relax
-		    \immediate\write\pdfpcnotestmp{ \unexpanded\expandafter{\beamer@noteenvstart} \unexpanded{#2}  \unexpanded\expandafter{\beamer@noteenvend}}%
-		    \immediate\closeout\pdfpcnotestmp\jobname.pdfpc.tmp\relax
-		    \getabspath{\jobname.pdfpc.tmp}
-		    \immediate\write18{\pdfpc@PANDOC \theabspath > \theabspath.markdown}
-		    \begingroup\obeylines%
-		    \CatchFileDef{\tmpvar}{\theabspath.markdown}{} %
-		    \newlinechar`\^^M %
-		    \immediate\write\pdfpcnotesfile{\unexpanded\expandafter{\tmpvar}}%
-		    \endgroup
-		    \endgroup
 
-		    \usebeamertemplate*{note page}%
-		    \vfil%
-		    \vskip-4pt% foot separator
-	    \vskip-\footheight}\hskip-\Gm@lmargin\hskip1cm}%
-	    \ifbeamer@twoscreensnotes%
-		\pgfpagescurrentpagewillbelogicalpage{2}%
-		\advance\c@page by-1\relax%
-	    \fi%
-	    \clearpage
-	    \endgroup
-	    \fi%
-	    \fi%
-	    \beamer@resumemode
-	}
 
 
 	\AtEndDocument{%
