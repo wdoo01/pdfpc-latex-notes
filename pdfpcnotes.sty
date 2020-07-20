@@ -21,6 +21,10 @@
 \def\pdfpc@PANDOC{pandoc -f latex -t markdown }
 \gdef\beamer@atbeginpnote{}%
 \gdef\beamer@atendpnote{}%
+\RequirePackage{iftex}
+\ifLuaTeX
+\RequirePackage{shellesc}%for \write18
+\fi
 
 % Small macro to make inserting options easier.
 \newcommand\PDFPC@option[2]{
@@ -85,6 +89,11 @@
 	\gdef\beamer@pnotes{}%
     }{}{}
     \pretocmd\beamer@framenotesend{%
+	\ifboolexpr{%
+		test {\ifdefempty{\beamer@pnotes}}
+	    and 
+		test {\ifdefempty{\beamer@pnoteitems}}
+	}{}{%not empty
 	\begingroup
 	\let\#\hashchar
 	\immediate\write\pdfpcnotesfile{\#\#\# \theframenumber}%
@@ -104,15 +113,16 @@
 	\unexpanded\expandafter{\beamer@atendpnote}%
     }%
     \endgroup%
-    \immediate\closeout\pdfpcnotestmp
-    \getabspath{\jobname.pdfpc.tmp}
-    \immediate\write18{\pdfpc@PANDOC \theabspath > \theabspath.markdown}
+    \immediate\closeout\pdfpcnotestmp%
+    \getabspath{\jobname.pdfpc.tmp}%
+    \immediate\write18{\pdfpc@PANDOC \theabspath > \theabspath.markdown}%
 
     \begingroup\obeylines%
     \CatchFileDef{\tmpvar}{\theabspath.markdown}{} %
     \newlinechar`\^^M %
     \immediate\write\pdfpcnotesfile{\unexpanded\expandafter{\tmpvar}}%
-    \endgroup
+    \endgroup%
+    }%
 }{}{}
 
 \def\pnote{%
@@ -134,6 +144,10 @@
 
 \newcommand\beamer@outsideframepnote[2][]{%
     \note[#1]{#2}%
+\def\temp{#2}\ifx\temp\empty%
+  %<EMPTY>%
+\else
+  %<NON EMPTY>%
   \beamer@savemode%
   \ifbeamer@inlecture%
     \def\beamer@pnoteenvstart{}%
@@ -161,7 +175,8 @@
 	    %%%%%%%%%%%%%%%
     %\fi%
   \fi%
-  \beamer@resumemode}
+  \beamer@resumemode%
+\fi}
 
 
 
